@@ -1,0 +1,447 @@
+---
+title: "Diabetes Data Set"
+author: "Esra UBUZ"
+date: "2023-11-25"
+output: html_document
+---
+
+```{r}
+library(readr)
+diabetess <- read_csv("C:/Users/Acer/Desktop/regresyon analizi/diabetess.csv")
+View(diabetess)
+```
+veri setini import ettik.
+
+Diyabet veri setini inceleyeceğiz.Bu veri setinde kişinin diyabetli olup olmadığını tespit edicez.
+Outcome olarak sadece "0" seçilirse tahmin etmek istenen Glucose. Bağımsız değişkenler ise  Pregnancies,BloodPressure,SkinThickness,Insulin, BMI,DiabetesPedigreeFunction,Age.
+
+```{r}
+df_zero <- diabetess[,c("Pregnancies","Glucose","BloodPressure","SkinThickness","Insulin",
+                      "BMI","DiabetesPedigreeFunction","Age")]
+nrow(df_zero)
+```
+
+
+```{r}
+names(df_zero)
+```
+
+```{r}
+df_zero <- df_zero[c("Pregnancies","Glucose","BloodPressure","SkinThickness","Insulin",
+                      "BMI","DiabetesPedigreeFunction","Age")]
+```
+
+
+```{r}
+cor(df_zero)
+```
+Veri içersinde NA olduğu görülmektedir.Veride Kayıp gözlem olduğu için na.omit kullanılıp NA değerlerinden temizlenecek.
+```{r}
+cor(na.omit(df_zero))
+```
+
+Korelasyon matrisi incelendiğinde bağımlı değişken (Age) ile bağımsız değişkenler arasındaki ilşikilerin negatif yönlü olduğu görünüyor.Değişkenler arasındaki ilşkiyi bir de görsel olarak incelersek;
+
+```{r}
+pairs(na.omit(df_zero), pch = 19)
+
+```
+
+KAYIP GÖZLEMLER
+Veri incelendiğinde veri içerisinde kayıp gözlmeler olduğu görülmektedir. Bu noktada kayıp gözlemleri işlem dışı bırakmak yerine doldurma işlemi yapabilirz.
+```{r}
+library(mice)
+md.pattern(df_zero)
+```
+
+md.pattern() komutu ile veri de hangi değişkenlerde kaç tane NA değeri olduğunu görebiliriz. Sonuçlar incelendiğinde 1985 gözlemde NA değeri bulunmamakla beraber,4 gözlem için sadece DiabetesPedigreeFunction değişkeninde NA değeri varken 2 gözlem(satır) için de sadece Insulin değişkeninde NA değeri olduğu görülmektedir.Veride de totalde 15 NA değerinin olduğu görülür.Şimdi bu değerleri doldurma işlemine geçersek;
+
+```{r}
+imputed<-mice(df_zero,m=5) 
+```
+```{r}
+names(imputed)
+```
+
+burda paketin atadığı değerleri ve farklı değerleri görebilmek için namesleri yazdırdık.
+```{r}
+imputed$imp
+```
+Sonuçlarda herbir değişkeni için imput edilmiş değerler görünmektedir.Bunlardan araştırmacı istediği birini yada ort. median gibi uygun olan değer ile doldurma işlemini gerçekleştirebilir. Varsayalım ki; 2. değerler ile doldurucağız;
+
+```{r}
+df_zero_Imp<-complete(imputed,2)
+View(df_zero_Imp)
+md.pattern(df_zero_Imp)
+```
+
+MODEL OLUŞTURMA
+
+Veri setini iki parçaya bölelim eğitim ve test olarak;
+
+```{r}
+set.seed(123)
+sampleIndex<-sample(1:nrow(df_zero_Imp),size=0.8*nrow(df_zero_Imp))
+trainset<-df_zero_Imp[sampleIndex,]
+testset<-df_zero_Imp[-sampleIndex,]
+```
+
+
+```{r}
+names(df_zero_Imp)
+```
+
+```{r}
+model1 <- lm(Age~Glucose+BloodPressure+SkinThickness+Insulin+BMI+DiabetesPedigreeFunction+Pregnancies, data = trainset)
+model1
+```
+```{r}
+summary(model1)
+```
+Bir lineer regresyon modelinin özetini gösteriyor. Bu özet, modelin hangi değişkenlerin kullanıldığını, bu değişkenlerin katsayılarını, t-testlerini, R-kare değerini ve diğer istatistiksel bilgileri sunuyor.
+
+- Residuals (Artıklar): Modelin tahminleri ile gerçek değerler arasındaki farkların dağılımını gösterir. 
+  
+- Coefficients (Katsayılar): Modelin regresyon katsayılarını verir. Her bir bağımsız değişkenin katsayısı, o değişkenin bağımlı değişken üzerindeki etkisini gösterir. "Estimate" sütunu, katsayıların tahmin edilen değerlerini; "Std. Error" sütunu, tahmin edilen katsayıların standart hatalarını; "t value" sütunu, t-test istatistiğini; "Pr(>|t|)" sütunu, ilişkili p-değerlerini gösterir.
+
+- Residual standard error (Artık standart hatası): Artıkların (tahmin hatalarının) ortalama büyüklüğünü verir. Daha düşük değer, modelin verilere daha iyi uymasını gösterebilir.
+
+- Multiple R-squared (Çoklu R-kare): Bağımsız değişkenlerin bağımlı değişkendeki varyansın açıklama yüzdesidir. Yüksek değerler, modelin verileri daha iyi açıkladığını gösterebilir.
+
+- Adjusted R-squared (Düzeltilmiş R-kare): Çoklu R-kare'ye benzer, ancak modeldeki ek bağımsız değişkenlerin sayısını da dikkate alır. Daha az değişken ile daha iyi açıklama yapabilen modellerde daha güvenilir bir ölçüdür.
+
+- F-statistic (F istatistiği): Modelin anlamlılığını test etmek için kullanılan bir istatistiktir. Anlamlı bir F değeri, en az bir bağımsız değişkenin bağımlı değişkendeki değişimi açıkladığı anlamına gelir.
+
+- p-value: F-statistic veya her katsayının t-testi için hesaplanan p-değerleridir. Küçük p-değerleri, ilgili katsayıların anlamlı olduğunu gösterir.
+
+Bu özet, modelin ne kadar iyi uyum sağladığını, hangi değişkenlerin önemli olduğunu ve modelin verilere ne kadar iyi uyduğunu anlamak için önemlidir.
+
+
+
+Sonuçları incelendiğimizde modelin R^2=0.37 olarak görülmektedir. model anlamlılıdır çünkü p<2.2e−16
+Değişkenlerin anlamlılıkları incelenirse BMI anlamlı olmadığı ve DiabetesPedigreeFunction değişkeninin ise çok da anlamlı görünmemektedir.Bu değişkenleri modelden çıkararak yeni bir model oluşturdum.
+
+```{r}
+model2 <- lm(Age~Glucose+BloodPressure+SkinThickness+Insulin+Pregnancies, data = trainset)
+model2
+```
+```{r}
+summary(model2)
+```
+Model2 sonuçları değerlendirildiğinde R2 değerinde belirgin bir artış yoktur.Çok küçük miktarda olmuştur. Ve oluşturulan model anlamlıdır. Katsayılar yorumlanadığında örneğin; Pregnancies değişkeninindeki 1 birimlik değişim Age üzerinde 1.73 birimlik bir artışa neden olurken;SkinThickness değişkeninde 1 birimlik bir artış Age üzerinde 0.06 birimlik bir azalışa neden olmaktadır.Insulin değişkeninde 1 birimlik bir artış Age üzerinde 0.008 birimlik bir azalışa neden olmaktadır.BloodPressure değişkeninde 1 birimlik bir artış Age üzerinde 0.11 birimlik bir artışa neden olmaktadır.Glucose değişkeninde 1 birimlik bir artış Age üzerinde 0.07 birimlik bir artışa neden olmaktadır.
+
+REGRESYON METRİKLERİ -AIC ve BIC-
+
+Bu metrikler birden fazla modelin karşılaştırılmasında kullanılan metriklerdendir.Her iki metrik içinde min değer olması istenen durumdur.
+Burada k: modeldeki paremetre sayısıdır (k+1).β0 dahil.
+```{r}
+AIC(model1,k=9)
+```
+```{r}
+AIC(model2,k=7)
+```
+```{r}
+BIC(model1)
+```
+```{r}
+BIC(model2)
+```
+
+AIC değerlendirme ölçütüne göre model2 daha iyi görünmektedir.Ancak BIC değerlendirme ölçütüne göre model1 daha iyidir.
+Bunu birde grafik üzerinde görelim.
+
+```{r}
+plot(model2)
+```
+
+İlk grafik bize artıkların dağılışını gösteriyor.Belirgin bir sorun görünmemekte ancak verinin başlangıcında huni dikkat çekmektedir.İkinci grafik bize artıkların normal dağılıp dağılmadığı inceleniyor.Grafikte başlangıçta noktaların çizgi üzerinde olduğu görülürken, sonlara doğru çizgi üzerinden saptığı görülür.Üçüncü grafikte standartlaştırılmış artıklar görülmektedir.Dördüncü grafikte ise baskınlık grafiğidir.
+
+
+Değişen varyans tespiti için Breusch Pagan testini kullanıcaz.Bunun için gerekli paketi kütüphaneden çağırdım.
+```{r}
+library(lmtest)
+```
+
+```{r}
+bptest(model2)
+```
+Bu testin sonuçları değerlendirildiğinde p değeri düşük olduğundan dolayı,null hipotezi reddedilir ve varyansın homojen olmadığı sonucuna varılır.
+
+Pratikde grafikler üzerinden bir ilişki tahmin edilmeye çalışılır.Ve ona göre dönüşüm yapılır.Bu noktada henüz aykırı tespiti yapılmadığı için aykırı tespitinden sonra değişen varyans durumu yeniden incelenip düzelmemiş ise gerekli işlemler yapılmalıdır.
+
+
+Model değerlendirme metricleri üzerinden inceleyelim; Öncelikle model2 oluşturulurken çıkardığımız değişkenleri testset içerisinden de çıkarmalıyız. Veri seti içerisinden çıkardığımız BMI değişkeni 6.sırada,DiabetesPedigreeFunction değişkeni ise 7.sırada yer aldığından bu satırları testset içerisindende çıkardık.
+```{r}
+testset2<-testset[-6,-7]
+predictions<-predict(model2,testset2)
+head(predictions)
+```
+Model2 den elde edilen tahminleri gördük.Şimdi metricler inceleyelim;
+
+```{r}
+library(caret)
+R2(predictions,testset2$Age)
+```
+R-kare, bir regresyon modelinin gözlemlenen değerler üzerinde ne kadar iyi uyum sağladığını gösteren bir ölçüdür.
+Değerler ne kadar yakınsa, modelin verilere o kadar iyi uyduğu söylenebilir.1'e yaklaşan bir R-kare ,daha iyi bir uyumu temsil eder.Burada 0.33 olan R-kare değeri modelin gözlemlenen verilere uyum sağladığını gösteriyor.
+```{r}
+RMSE(predictions,testset2$Age)
+```
+Root Mean Squared Error, tahminlerin gerçek değerlerden ne kadar farklı olduğunu ölçer.Düşük bir RMSE daha iyi bir model performansını ifade eder.Burada 9.59 olan RMSE değeri ortalama olarak tahminlerin gerçek değerlerden yaklaşık 9.59 birimlik uzaklıkta olduğunu gösteriyor.
+
+
+```{r}
+MAE(predictions,testset2$Age)
+```
+Mean Absolute Error,tahminlerin gerçek değerlerden mutlak farkının ortalamasıdır.Daha düşük MAE, daha iyi bir model performansını gösterir.Burada  6.22 olan MAE değeri, ortalama olarak tahminlerin gerçek değerlerden yaklaşık 6.22 birimlik uzaklıkta olduğunu gösteriyor.
+
+Bu metrikler modelimizin performansını değerlendirmek için kullanılır.Daha yüksek R2 değerlerive daha düşük RMSE ve MAE değerleri, genellikle daha iyi tahmin eden modellerin göstergesidir.
+
+AYKIRI DEĞER KONTROLÜ
+
+Cook's distance, regresyon analizindeki aykırı gözlemleri belirlemek için kullanılan bir ölçüdür.
+```{r}
+dist<-cooks.distance(model2)
+head(dist)
+```
+
+Aykırı gözlemleri belirlemek için eşik değerler oluşturdum.
+
+```{r}
+olcut1<- mean(dist)*3
+olcut2<-4/length(dist)
+olcut1;olcut2
+```
+Her iki değerde birbirine oldukça yakın görünmektedir.Ama cook distancle değerleri genelde küçük olduğundan bu fark önemli de olabilir.Her iki olcut içinde ayrı ayrı işlem yaparsak; Şimdi aykırı olan gözlemlerin indexlerini elde edelim;
+
+which fonksiyonu,belirtilen koşulu sağlayan gözlemlerin indekslerini döndürür.
+```{r}
+olcut1Index<-which(dist>olcut1)
+olcut2Index<-which(dist>olcut2)
+length(olcut1Index)
+```
+```{r}
+length(olcut2Index)
+```
+Olcut1’e göre 121, olcut2’ye göre de 107 tane aykırı değerin var olduğu tespit edilmiştir.Bu noktada aralarından bir tanesi seçilerek model oluşturmak istersek;Olcut1 olsun; Görsel olarakda cook disatncleri incelersek;
+
+
+
+```{r}
+plot(1:length(dist),dist,type='p',ylim=range(dist)*c(1,1))
+```
+Grafiği daha detaylı incelemek istersek;
+```{r}
+plot(1:length(dist),dist,type='p',ylim=range(dist)*c(1,0.001))
+```
+
+Ölcut değerini net görmek için line çizdirmek istersek;
+```{r}
+plot(1:length(dist),dist,type='p',ylim=range(dist)*c(1,0.07))
+abline(h=olcut1,col='purple')
+```
+Mor hattın üzerindeki değerler cook distance’a göre aykırı değerleri gösterir.Şimdi veri içerisinde bulunan bu aykırı değerleri trainset içerisniden çıkaralım;
+```{r}
+trainsetrem<-trainset[-olcut1Index,]
+nrow(trainset)
+```
+
+```{r}
+nrow(trainsetrem)
+```
+
+MODEL KARŞILAŞTIRMASI
+
+Aykırı değerlerden arınmış veri ile yeni model oluşturup bunu model2 ile karşılaştıracağız.
+```{r}
+model3 <- lm(Age ~ Glucose + BloodPressure + SkinThickness + 
+                Insulin + Pregnancies, data = trainsetrem)
+model3
+```
+
+
+```{r}
+summary(model3)
+```
+
+```{r}
+summary(model2)
+```
+
+
+```{r}
+bptest(model3)
+```
+
+```{r}
+plot(model3)
+```
+
+```{r}
+AIC(model3,k=7)
+```
+```{r}
+AIC(model2,k=7)
+```
+```{r}
+BIC(model3)
+```
+```{r}
+BIC(model2)
+```
+AIC ve BIC kriterleri de değerlendirildiğinde model3’un daha iyi olduğu görülmektedir.Test set üzerinden model değerlendirmesi yaparsak;
+
+
+```{r}
+predictions3<-predict(model3,testset2)
+R2(predictions3,testset2$Age)
+```
+```{r}
+RMSE(predictions3,testset2$Age)
+```
+```{r}
+MAE(predictions3,testset2$Age)
+```
+
+karsılaştırma yapmak içim model2 nin sonuçlarını da alalım;
+```{r}
+predictions2<-predict(model2,testset2)
+R2(predictions2,testset2$Age)
+```
+
+```{r}
+RMSE(predictions2,testset2$Age)
+```
+
+```{r}
+MAE(predictions2,testset2$Age)
+```
+Sonuçları değerlendirdiğimizde, Model2 ile Model3 arasında test seti üzerinde çok belirgin bir fark gözlenmemektedir. MAE değerinde bir düşüş olsa da, bu düşüş test setinde gözlenmemektedir. Model3, eğitim setinde aykırı değerleri çıkardıktan sonra daha iyi performans göstermiş olmasına rağmen, test seti üzerinde iki model arasında belirgin bir fark gözlenmemiştir. Bu nedenle, k-fold cross validation gibi yöntemler kullanılarak modellerin performansı daha kapsamlı bir şekilde değerlendirilebilir.
+
+Ayrıca, bu noktada oluşturulan son modelin, veri ön işlemesi yapıldığında ve varsayımlar kontrol edildiğinde daha iyi olduğu düşünülebilir. Test verisi üzerinde belirgin olmasa da, eğitim verisinde daha iyi sonuçlar elde edilmiştir.
+
+Bu aşamada, bir diğer önemli varsayım olan Multicollinearity incelenmelidir.
+
+ÇOKLU BAĞLANTI SORUNU
+
+Genel anlamda bağımsız değişkenler birbirleriyle yüksek dereceli olarak ilşkili iseler bu durumda çoklu bağlantı sorunu ile karşılaşılabilir.Bunu belirlemek için
+
+Öncelikle cor matrisi incelenebilir ve VIF değerleri değerlendirilmelidir.
+```{r}
+library(car)
+vif(model3)
+```
+Burada bir regresyon modelindeki bağımsız değişkenler arasındaki çoklu doğrusallığı (multicollinearity) değerlendirmek için "Variance Inflation Factor" (VIF) hesaplamasını kullanıyoruz. VIF değerleri, bir bağımsız değişkenin diğer bağımsız değişkenlerle ne kadar ilişkili olduğunu ve bu durumun modeldeki etkisini gösterir. Genellikle, VIF değeri 10'dan büyükse çoklu doğrusallık olarak kabul edilir.
+Tüm VIF değerleri 10'dan küçük olduğu için çoklu bağlantı sorunu bulunmamaktadır. Bu durum, bağımsız değişkenler arasında kabul edilebilir bir düzeyde ilişki olduğunu gösterir.Eğer VIF > 10 değişkenimiz olsaydı veri setinden çıkarark yeniden inceleme yapacaktık.
+
+Insulın değişeknini modelden çıkararak deneme yaparsak;
+```{r}
+model_vif1 <- lm(Age ~ Glucose + BloodPressure + SkinThickness + Pregnancies, data = trainsetrem)
+vif(model_vif1)
+```
+```{r}
+summary(model_vif1)
+```
+R^2 değeri daha iyi residual st err değeride bir miktar azalmış görünmektedir. Şimdi Pregnancies değişkenini modelden çıkararak devam edersek;
+
+```{r}
+model_vif2 <- lm(Age ~ Glucose + BloodPressure + SkinThickness , data = trainsetrem)
+vif(model_vif2)
+```
+
+
+```{r}
+summary(model_vif2)
+```
+VIF değerleri çok değişim göstermesede daha iyi görünmektedir. İlk modeldeki R^2  değeri , ikinci modele göre daha yüksektir (0.5337 ve 0.1392). Bu, ilk modelin Age'deki değişkenliği daha iyi açıkladığını gösterir.
+
+5 veya 10'dan yüksek VIF değerleri, genellikle çoklu doğrusallık sorunlarına işaret eder. VIF değerleri ne kadar düşükse (1'e yakınsa) çoklu doğrusallık o kadar azdır.
+
+Bu durumda, ikinci modelde çoklu doğrusallık sorunlarını azaltmak için bir adım atılmış olsa da,R^2  değerinin düşük olması modelin tahmin gücünde bir azalmaya işaret ediyor.
+
+Şimdi modelleri test veri seti üzerinden değerlendirelim;
+
+Test Seti Üzerinden Model Değerlendirme
+
+```{r}
+predictionsvif2<-predict(model_vif2,testset2)
+R2(predictionsvif2,testset2$Age)
+```
+
+```{r}
+RMSE(predictionsvif2,testset2$Age)
+```
+
+```{r}
+MAE(predictionsvif2,testset2$Age)
+```
+karsılaştırma yapmak içim model2 nin sonuçlarını da alalım;
+```{r}
+predictionsvif1<-predict(model_vif1,testset2)
+R2(predictionsvif1,testset2$Age) 
+```
+
+```{r}
+RMSE(predictionsvif1,testset2$Age)
+```
+
+```{r}
+MAE(predictionsvif1,testset2$Age)
+```
+Vıf1 modelinin daha iyi performance gösterdiğini test set üzerinden de görmekteyiz.Yani model_vif1 Insulın değişkeninin modelde olmadığı versiyonudur.
+
+
+İLİŞKİLİ HATALAR
+
+Hatalar arasında ilişki yoksa hataların ε=0doğrusu etrafında rastgele dağılması gerekir.Daha iyi inceleyebilmek için,εiˆile εiˆ+1'lerin scatter graphını inceleyelim.
+
+Modelin artıklarının otokorelasyonunu (birbirleriyle ilişkisini) görselleştirdik.
+```{r}
+n <- length(residuals(model3))
+plot(tail(residuals(model3),n-1) ~ head(residuals(model3),n-1), xlab=
+expression(hat(epsilon)[i]),ylab=expression(hat(epsilon)[i+1]))
+abline(h=0,v=0,col=grey(0.75))
+```
+
+```{r}
+summary(lm(tail(residuals(model3),n-1) ~ head(residuals(model3),n-1) -1))
+```
+
+Bu çıktıda, artıklar arasındaki ilişkiyi incelemek için bir regresyon modeli oluşturduk.Ancak, modelin çıktısına bakılınca, artıklar arasında bir ilişki olduğunu veya bu ilişkinin istatistiksel olarak anlamlı olduğunu belirlemek zor görünüyor.
+
+Modelin katsayısı için t-testi, ilişki katsayısının sıfır olma olasılığını değerlendirir. Burada, ilişki katsayısı için p-değeri (Pr(>|t|)) 0.9023'tür. Bu değer yüksek olduğundan, ilişki katsayısının istatistiksel olarak anlamlı olmadığı sonucuna varılabilir.
+
+R-kare ve düzeltilmiş R-kare değerleri çok düşük ve hatta negatif olduğundan, modelin artıklar arasındaki değişimi açıklama gücü sınırlı veya çok zayıftır.
+
+Bu çıktılara dayanarak, modelin artıkları arasında anlamlı bir ilişki bulunmadığını söyleyebiliriz. Bu durum, regresyon modelinin artıklarının bağımsız ve rasgele olduğunu, dolayısıyla modelin iyi bir şekilde uyarlandığını gösterir.
+
+Yani iki tip residual arasında doğrusal ilişki söz konusu değildir.
+
+Bunun dışında Durbin-Watson test istatistiğide kullanılabilir.
+
+Durbin-Watson test istatistiği, regresyon modelinin artıklarındaki otokorelasyonu (seri arasındaki ilişkiyi) değerlendirmek için kullanılır. Bu test istatistiği, regresyon modelinin artıklarının bağımsız olup olmadığını belirlemeye çalışır.
+Durbin-Watson istatistiği, artıklar arasındaki otokorelasyonu ölçer. Değerleri genellikle 0 ile 4 arasında olur. Bu istatistik, 0'a yaklaştıkça artıklar arasında pozitif otokorelasyon olduğunu, yani artıkların birbirleriyle pozitif bir şekilde ilişkili olduğunu gösterir. 4'e yaklaştıkça, artıklar arasında negatif otokorelasyon olduğunu, yani artıkların birbirleriyle negatif bir şekilde ilişkili olduğunu gösterir. 2 değeri ise otokorelasyonun olmadığını veya zayıf olduğunu gösterir.
+
+```{r}
+require(lmtest)
+dwtest(Age ~ Glucose + BloodPressure + SkinThickness + 
+                Insulin + Pregnancies, data = trainsetrem)
+```
+Bu örnekte, DW istatistiği 2'ye oldukça yakın bir değer aldığı için, otokorelasyonun olmadığını veya en azından zayıf olduğunu gösteriyor.
+
+P-değeri 0.5363 olarak verilmiş. Bu p-değeri, null hipotezinin reddedilebilmesi için bir kanıt sağlar. Bu durumda, p-değeri oldukça yüksek olduğu için, otokorelasyon olasılığının istatistiksel olarak anlamlı olmadığı veya en azından modeldeki otokorelasyonun belirgin olmadığı sonucuna varılabilir.
+
+Bu çıktıya göre, modelin artıkları arasında belirgin bir otokorelasyon olmadığı veya en azından zayıf bir otokorelasyon olduğu sonucuna varılabilir. Bu da modelin artıklarının bağımsız ve rasgele olduğunu düşündürebilir.
+
+Ayrıca Breusch-Godfrey Test’ide otokorelasyon durumununun tespiti için kullanılır.
+
+Breusch-Godfrey test, regresyon modelinin artıkları arasındaki seri korelasyonu değerlendirmek için kullanılır. Bu test, artıklar arasında bağımsızlık olup olmadığını kontrol eder, genellikle belirli bir düzeni veya ilişkiyi tespit etmeye çalışır.
+```{r}
+library(lmtest)
+model3 <- lm(Age ~ Glucose + BloodPressure + SkinThickness + 
+                Insulin + Pregnancies, data = trainsetrem)
+lmtest::bgtest(model3, order = 3)
+```
+p değeri anlamlılık düzeyi olan 0.05'ten küçük ise H0 hipotezi reddedilir.
+p-değeri, null hipotezinin (H0) red edilemez. Genellikle, p-değeri belirli bir anlamlılık seviyesi ile karşılaştırılır. Bu durumda p-değeri oldukça yüksek olduğu için, seri korelasyonun istatistiksel olarak anlamlı olmadığı veya en azından modeldeki seri korelasyonun belirgin olmadığı sonucuna varılabilir.
+Bu durum, regresyon modelinin artıklarının bağımsız ve rasgele olduğunu düşündürebilir.
